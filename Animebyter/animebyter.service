@@ -1,0 +1,21 @@
+[Unit]
+Description=Adds new episodes from animebytes on qbittorrent
+After=network.target qbittorrent.service
+
+[Service]
+
+WorkingDirectory=/home/marios/Animebyter                            #The location of the animebyter script
+ExecStart=/usr/bin/python3.7 animebyter.py
+User=marios
+Restart=always
+
+Environment=qbit_url=http://127.0.0.1:8080                          #URL of your qBittorrent WebUI
+Environment=qbit_user=admin                                         #Username for qBittorrent WebUI
+Environment=qbit_pass=adminadmin                                    #Password for qBittorrent WebUI
+Environment=ab_key=YOUR_ANIMEBYTES_TOKEN                            #Your animebytes token. You can find this by querying any of the RSS feeds
+Environment=channel=THE_CHANNEL_YOU_WANT_TO_SEND_NOTIFICATIONS_IN   #The ID of the channel you want to send notifications in on discord
+Environment=discord_token=YOUR_DISCORD_TOKEN                        #The token of your discord bot
+Environment=INTERVAL=300                                            #It will look for new episodes every x seconds
+
+[Install]
+WantedBy=multi-user.target
