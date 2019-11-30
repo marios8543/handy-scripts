@@ -1,0 +1,15 @@
+[Unit]
+Description=StoryBear with intergrated web server
+After=network.target mysql.service
+
+[Service]
+User=marios
+ExecStart=/usr/bin/python3 /home/ipdb-downloader.py   #Replace this according to where you've saved the script
+Environment=token=IP2LOCATION_TOKEN                   #Your IP2LOCATION token. You can get this Register on: https://www.ip2location.com/
+Environment=db_host=127.0.0.1                         #The address of your mysql server
+Environment=db_user=root                              #Username for mysql
+Environment=db_pass=MYSQL_PASSWORD                    #Password for mysql
+Environment=db_db=ip_logging                          #Database for mysql
+
+[Install]
+WantedBy=multi-user.target
