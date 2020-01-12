@@ -11,8 +11,18 @@ client = Bot('ab!')
 QB_URL = getenv("qbit_url")
 INTERVAL = int(getenv("INTERVAL")) if getenv("INTERVAL") else 300
 web = ClientSession()
-db = TinyDB("animebyter.json")
-chn = int(getenv("channel"))
+db = TinyDB(getenv("database_path","animebyter.json"))
+path = getenv("download_path")
+
+def get_channel_id():
+    res = db.search(Query().type == 'channel')
+    if len(res) > 0:
+        chn = res[0]['id']
+    else:
+        db.insert({'type':'channel','id':''})
+        chn = None
+    return chn
+get_channel_id()
 
 downloading = []
 
@@ -49,9 +59,8 @@ async def get_airing():
 
 async def add_torrent(anime):
     print("Adding episode {} of {}".format(anime.last_episode,anime.title))
-    path = "/mnt/Storage/Anime"
     try:
-        res = await web.post(QB_URL+'/command/download',data={'urls':anime.torrent_link,'savepath':join(path,anime.title),'label':'Anime'})
+        res = await web.post(QB_URL+'/command/download',data={'urls':anime.torrent_link,'savepath':join(path,anime.title),'category':'Anime'})
     except Exception as e:
         print(str(e))
         return
@@ -77,7 +86,7 @@ async def main():
                     if le<i.last_episode and i.resolution in ("1080p"):
                         msg = await add_torrent(i)
                         if msg:
-                            await client.get_channel(chn).send(msg)
+                            await client.get_channel(get_channel_id()).send(msg)
                         db.update({'last_episode':i.last_episode},Query().title==i.title)
         except Exception as e:
             print(str(e))
@@ -90,7 +99,7 @@ async def dl_watchdog():
     print("Starting download watchdog")
     while True:
         try:
-            res = await web.get(QB_URL+"/query/torrents",params={'filter':'downloading','label':'Anime'})
+            res = await web.get(QB_URL+"/query/torrents",params={'filter':'downloading'})
             if res.status==200:
                 res = await res.json()
                 names = []
@@ -104,7 +113,7 @@ async def dl_watchdog():
                                 downloading.remove(i)
                         except ValueError:
                             pass
-                        await client.get_channel(chn).send(":exclamation: <@!196224042988994560> {} has finished downloading.".format(i))
+                        await client.get_channel(get_channel_id()).send(":exclamation: <@!196224042988994560> {} has finished downloading.".format(i))
             else:
                 print("Something went wrong with fetching downloads ({}: {})".format(res.status,await res.text()))
         except Exception as e:
@@ -121,9 +130,16 @@ def chunks(s, n=1999):
 @client.command(pass_context=True)
 async def add(ctx):
     airing = await get_airing()
+    already_added = []
     txt = ""
-    for i,v in enumerate(airing):
+    i = 0
+    for v in airing:
+        if v.title in already_added:
+            continue
+        else:
+            already_added.append(v.title)
         txt+="{}) {}\n".format(i,v.title)
+        i += 1
     msgs = []
     for i in chunks(txt):
         msgs.append(await ctx.send(i))
@@ -146,6 +162,8 @@ async def remove(ctx):
     watching = db.all()
     txt = ""
     for i,v in enumerate(watching):
+        if not 'title' in v:
+            continue
         txt+="{}) {}\n".format(i,v['title'])
     msgs = []
     for i in chunks(txt):
@@ -164,7 +182,7 @@ async def remove(ctx):
             return await ctx.send("Invalid number")
         an = watching[msg]
         db.remove(Query().title==an['title'])
-        return await ctx.send("Removed {}".format(an))
+        return await ctx.send("Removed {}".format(an['title']))
 
 @client.command(pass_context=True)
 async def down(ctx):
@@ -186,6 +204,11 @@ async def down(ctx):
         if msg>=len(airing):
             return await ctx.send("Invalid number")
         await ctx.send(await add_torrent(airing[msg]))
+
+@client.command(pass_context=True)
+async def setchannel(ctx):
+    db.update({'id':ctx.channel.id},Query().type == 'channel')
+    await ctx.send("I will now send notifications to this channel!")
 
 @client.event
 async def on_ready():
