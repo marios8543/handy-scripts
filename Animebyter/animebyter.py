@@ -22,7 +22,18 @@ def get_channel_id():
         db.insert({'type':'channel','id':''})
         chn = None
     return chn
+
+def get_notif_id():
+    res = db.search(Query().type == 'notifications')
+    if len(res) > 0:
+        id = res[0]['id']
+    else:
+        db.insert({'type':'notifications','id':''})
+        id = None
+    return id
+
 get_channel_id()
+get_notif_id()
 
 downloading = []
 
@@ -32,6 +43,12 @@ class Anime:
         self.last_episode = le
         self.torrent_link = tl
         self.resolution = res.strip()
+
+    def __eq__(self,other):
+        return self.title == other.title
+
+    def __hash__(self):
+        return hash(self.title)
 
 async def login_qb():
     async with web.post(QB_URL+'/login',data={'username':getenv("qbit_user"),'password':getenv("qbit_pass")}) as res:
@@ -113,7 +130,7 @@ async def dl_watchdog():
                                 downloading.remove(i)
                         except ValueError:
                             pass
-                        await client.get_channel(get_channel_id()).send(":exclamation: <@!196224042988994560> {} has finished downloading.".format(i))
+                        await client.get_channel(get_channel_id()).send(":exclamation: <@!{}> {} has finished downloading.".format(get_notif_id(),i))
             else:
                 print("Something went wrong with fetching downloads ({}: {})".format(res.status,await res.text()))
         except Exception as e:
@@ -129,17 +146,10 @@ def chunks(s, n=1999):
 
 @client.command(pass_context=True)
 async def add(ctx):
-    airing = await get_airing()
-    already_added = []
+    airing = list(set(await get_airing()))
     txt = ""
-    i = 0
-    for v in airing:
-        if v.title in already_added:
-            continue
-        else:
-            already_added.append(v.title)
+    for i,v in enumerate(airing):
         txt+="{}) {}\n".format(i,v.title)
-        i += 1
     msgs = []
     for i in chunks(txt):
         msgs.append(await ctx.send(i))
@@ -159,11 +169,9 @@ async def add(ctx):
 
 @client.command(pass_context=True)
 async def remove(ctx):
-    watching = db.all()
+    watching = [i for i in db.all() if 'title' in i]
     txt = ""
     for i,v in enumerate(watching):
-        if not 'title' in v:
-            continue
         txt+="{}) {}\n".format(i,v['title'])
     msgs = []
     for i in chunks(txt):
@@ -209,6 +217,11 @@ async def down(ctx):
 async def setchannel(ctx):
     db.update({'id':ctx.channel.id},Query().type == 'channel')
     await ctx.send("I will now send notifications to this channel!")
+
+@client.command(pass_context=True)
+async def setnotif(ctx):
+    db.update({'id':ctx.author.id}, Query().type == 'notifications')
+    await ctx.send("I will now tag you for notifications!")
 
 @client.event
 async def on_ready():
