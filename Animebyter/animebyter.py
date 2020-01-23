@@ -39,7 +39,7 @@ downloading = []
 
 class Anime:
     def __init__(self,name,le,tl,res):
-        self.title = name
+        self.title = name.replace("/","-")
         self.last_episode = le
         self.torrent_link = tl
         self.resolution = res.strip()
@@ -74,21 +74,24 @@ async def get_airing():
                 continue
     return r
 
-async def add_torrent(anime):
+async def add_anime(anime):
     print("Adding episode {} of {}".format(anime.last_episode,anime.title))
     try:
-        res = await web.post(QB_URL+'/command/download',data={'urls':anime.torrent_link,'savepath':join(path,anime.title),'category':'Anime'})
+        await add_torrent(anime.torrent_link, join(path,anime.title), 'Anime')
     except Exception as e:
-        print(str(e))
-        return
-    finally:
-        res.close()
-    if res.status==200:
+        print("Failed to add episode {} of {} ({})".format(anime.last_episode,anime.title,e))
+    else:
         msg = "Added episode {} of {}".format(anime.last_episode,anime.title)
         print(msg)
         return msg
-    else:
-        print("Failed to add episode {} of {} ({})".format(anime.last_episode,anime.title,res.status))
+        
+
+async def add_torrent(url,path,category):
+    async with web.post(QB_URL+'/command/download',data={'urls':url,'savepath':path,'category':category}) as res:
+        if res.status==200:
+            return 1
+        else:
+            raise Exception(await res.text())
 
 async def main():
     print("Starting new episode checker")
@@ -101,7 +104,7 @@ async def main():
                 if res:
                     le = res[0]['last_episode']
                     if le<i.last_episode and i.resolution in ("1080p"):
-                        msg = await add_torrent(i)
+                        msg = await add_anime(i)
                         if msg:
                             await client.get_channel(get_channel_id()).send(msg)
                         db.update({'last_episode':i.last_episode},Query().title==i.title)
@@ -211,7 +214,23 @@ async def down(ctx):
             return await ctx.send(e)
         if msg>=len(airing):
             return await ctx.send("Invalid number")
-        await ctx.send(await add_torrent(airing[msg]))
+        await ctx.send(await add_anime(airing[msg]))
+
+@client.command(pass_context=True)
+async def torrent(ctx,url,path=None,category=None):
+    if not path:
+        if 'jpopsuki' in url:
+            path = '/Music/'
+        else:
+            path = '/Downloads/'
+    if not category:
+        if 'jpopsuki' in url:
+            category = 'Music'
+    try:
+        await ctx.send(await add_torrent(url,path,category))
+    except Exception as e:
+        await ctx.send("Failed to add torrent: {}".format(e))
+    
 
 @client.command(pass_context=True)
 async def setchannel(ctx):
