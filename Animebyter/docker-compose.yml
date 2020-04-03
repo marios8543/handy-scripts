@@ -5,18 +5,22 @@ services:
     container_name: animebyter
     environment:
         - qbit_url=http://qbittorrent:8080
-        - qbit_user=admin
-        - qbit_pass=adminadmin
-        - ab_key=YOUR_ANIMEBYTES_KEY
-        - discord_token=YOUR_DISCORD_TOKEN
-        - download_path=/Anime
+        - ab_key=YOUR_ANIMEBYTES_TOKEN
+        - database=/db/animebyter.json
+        - base_url=/animebyter
+        - gotify_url=Gotify_URL
+        - LOGLEVEL=INFO
     volumes:
         - ./db:/db
     networks:
         - qbit-network
+        - animebyter-network
     restart: unless-stopped
 
 networks:
+  animebyter-network:
+    driver: bridge
+
   qbit-network:
     external:
       name: qbittorrent_qbit-network
