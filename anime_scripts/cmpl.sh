@@ -16,10 +16,12 @@ cd /scripts
 bash notif.sh "$name";
 
 if [[ "$category" == "Anime" ]]; then
-	echo "Running jellyfin namer";
+	echo "Running jellyfin namer and subtitle converter";
 	if [[ -d "$root_path" ]]; then
+		bash subtitle-converter.sh "$root_path";
 		bash jellyfin-namer.sh "$root_path";
 	else
+		bash subtitle-converter.sh "$save_path";
 		bash jellyfin-namer.sh "$save_path";
 	fi
 fi
